@@ -25,16 +25,49 @@ import (
 )
 
 type DeploymentModel struct {
-	Name            string
-	Namespace       string
-	Replicas        int32
-	TunnelID        string
-	Image           string
-	ImagePullPolicy corev1.PullPolicy
-	Command         []string
-	Args            []string
-	Secret          *corev1.Secret
-	ConfigMap       *corev1.ConfigMap
+	Name       string
+	Namespace  string
+	TunnelID   string
+	Container  *corev1.Container
+	Deployment *appsv1.DeploymentSpec
+}
+
+func (d *DeploymentModel) GetContainer() *corev1.Container {
+	if d.Container.Image == "" {
+		d.Container.Image = "cloudflare/cloudflared:latest"
+	}
+
+	if len(d.Container.Command) == 0 {
+		d.Container.Command = []string{"cloudflared"}
+	}
+
+	if len(d.Container.Args) == 0 {
+		d.Container.Args = []string{"tunnel", "--metrics", "localhost:9090", "--no-autoupdate", "--config", "/config/config.yaml", "run"}
+	}
+
+	d.Container.Name = "cloudfalred"
+
+	d.Container.Ports = append(d.Container.Ports, corev1.ContainerPort{
+		Name:          "metrics",
+		ContainerPort: 9090,
+		Protocol:      corev1.ProtocolTCP,
+	})
+
+	d.Container.VolumeMounts = append(
+		d.Container.VolumeMounts,
+		corev1.VolumeMount{
+			Name:      "cloudflared-config",
+			MountPath: "/config/config.yaml",
+			SubPath:   "config.yaml",
+		},
+		corev1.VolumeMount{
+			Name:      "cloudflared-creds",
+			MountPath: "/config/" + d.TunnelID + ".json",
+			SubPath:   d.TunnelID + ".json",
+		},
+	)
+
+	return d.Container
 }
 
 func Deployment(model DeploymentModel) *DeploymentModel {
@@ -42,22 +75,27 @@ func Deployment(model DeploymentModel) *DeploymentModel {
 }
 
 func (d *DeploymentModel) GetDeployment() *appsv1.Deployment {
-	image := "cloudflare/cloudflared:latest"
-	if d.Image != "" {
-		image = d.Image
-	}
-	imagePullPolicy := corev1.PullAlways
-	if d.ImagePullPolicy != "" {
-		imagePullPolicy = d.ImagePullPolicy
-	}
-	command := []string{"cloudflared"}
-	if len(d.Command) != 0 {
-		command = d.Command
-	}
-	args := []string{"tunnel", "--metrics", "localhost:9090", "--no-autoupdate", "--config", "/config/config.yaml", "run"}
-	if len(d.Args) != 0 {
-		args = d.Args
-	}
+	deploy := d.Deployment
+	deploy.Template.Spec.Containers = append(deploy.Template.Spec.Containers, *d.GetContainer())
+	deploy.Template.ObjectMeta.Annotations["kubectl.kubernetes.io/default-container"] = "cloudflared"
+	deploy.Template.ObjectMeta.Labels["app.kubernetes.io/name"] = d.Name
+	deploy.Selector.MatchLabels["app.kubernetes.io/name"] = d.Name
+	deploy.Template.Spec.Volumes = append(deploy.Template.Spec.Volumes, corev1.Volume{
+		Name: "cloudflared-config",
+		VolumeSource: corev1.VolumeSource{
+			ConfigMap: &corev1.ConfigMapVolumeSource{
+				LocalObjectReference: corev1.LocalObjectReference{Name: d.Name + "-" + constants.ResourceSuffix},
+			},
+		},
+	}, corev1.Volume{
+		Name: "cloudflared-creds",
+		VolumeSource: corev1.VolumeSource{
+			Secret: &corev1.SecretVolumeSource{
+				SecretName: d.Name + "-" + constants.ResourceSuffix,
+			},
+		},
+	})
+
 	return &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      d.Name + "-" + constants.ResourceSuffix,
@@ -68,68 +106,6 @@ func (d *DeploymentModel) GetDeployment() *appsv1.Deployment {
 				"app.kubernetes.io/created-by": constants.OperatorName,
 			},
 		},
-		Spec: appsv1.DeploymentSpec{
-			Replicas: &d.Replicas,
-			Selector: &metav1.LabelSelector{
-				MatchLabels: map[string]string{
-					"app.kubernetes.io/name": d.Name,
-				},
-			},
-			Template: corev1.PodTemplateSpec{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{
-						"app.kubernetes.io/name": d.Name,
-					},
-				},
-				Spec: corev1.PodSpec{
-					Containers: []corev1.Container{
-						{
-							Name:            "cloudflared",
-							Image:           image,
-							ImagePullPolicy: imagePullPolicy,
-							Command:         command,
-							Args:            args,
-							Ports: []corev1.ContainerPort{
-								{
-									Name:          "metrics",
-									ContainerPort: 9090,
-									Protocol:      corev1.ProtocolTCP,
-								},
-							},
-							VolumeMounts: []corev1.VolumeMount{
-								{
-									Name:      "cloudflared-config",
-									MountPath: "/config/config.yaml",
-									SubPath:   "config.yaml",
-								},
-								{
-									Name:      "cloudflared-creds",
-									MountPath: "/config/" + d.TunnelID + ".json",
-									SubPath:   d.TunnelID + ".json",
-								},
-							},
-						},
-					},
-					Volumes: []corev1.Volume{
-						{
-							Name: "cloudflared-config",
-							VolumeSource: corev1.VolumeSource{
-								ConfigMap: &corev1.ConfigMapVolumeSource{
-									LocalObjectReference: corev1.LocalObjectReference{Name: d.Name + "-" + constants.ResourceSuffix},
-								},
-							},
-						},
-						{
-							Name: "cloudflared-creds",
-							VolumeSource: corev1.VolumeSource{
-								Secret: &corev1.SecretVolumeSource{
-									SecretName: d.Name + "-" + constants.ResourceSuffix,
-								},
-							},
-						},
-					},
-				},
-			},
-		},
+		Spec: *deploy,
 	}
 }

@@ -17,6 +17,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	v1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -28,9 +29,10 @@ type CloudflareTunnelSpec struct {
 	Zone    string                   `json:"zone"`
 	Service *CloudflareTunnelService `json:"service"`
 	// +kubebuilder:validation:Optional
-	Container       *CloudflareTunnelContainer `json:"container"`
-	TokenSecretName string                     `json:"tokenSecretName"`
-	Replicas        int32                      `json:"replicas"`
+	Container *corev1.Container `json:"container"`
+	// +kubebuilder:validation:Optional
+	Deployment      *v1.DeploymentSpec `json:"deployment"`
+	TokenSecretName string             `json:"tokenSecretName"`
 }
 
 type CloudflareTunnelService struct {

@@ -22,6 +22,8 @@ limitations under the License.
 package v1alpha1
 
 import (
+	appsv1 "k8s.io/api/apps/v1"
+	"k8s.io/api/core/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -150,7 +152,12 @@ func (in *CloudflareTunnelSpec) DeepCopyInto(out *CloudflareTunnelSpec) {
 	}
 	if in.Container != nil {
 		in, out := &in.Container, &out.Container
-		*out = new(CloudflareTunnelContainer)
+		*out = new(v1.Container)
+		(*in).DeepCopyInto(*out)
+	}
+	if in.Deployment != nil {
+		in, out := &in.Deployment, &out.Deployment
+		*out = new(appsv1.DeploymentSpec)
 		(*in).DeepCopyInto(*out)
 	}
 }

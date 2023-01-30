@@ -15,8 +15,8 @@ limitations under the License.
 */
 
 // Package v1alpha1 contains API Schema definitions for the cloudflare-tunnel-operator v1alpha1 API group
-//+kubebuilder:object:generate=true
-//+groupName=cloudflare-tunnel-operator.beezlabs.app
+// +kubebuilder:object:generate=true
+// +groupName=cloudflare-tunnel-operator.beezlabs.app
 package v1alpha1
 
 import (

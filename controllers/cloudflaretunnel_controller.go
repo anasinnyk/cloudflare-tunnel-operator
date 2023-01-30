@@ -397,27 +397,11 @@ func (r *CloudflareTunnelReconciler) createDeployment(ctx context.Context, cloud
 	var deploymentFetch appsv1.Deployment
 
 	tunnelDeploymentModel := models.DeploymentModel{
-		Name:      r.TunEx.Name,
-		Namespace: r.TunEx.Namespace,
-		Replicas:  r.TunEx.TunSpec.Replicas,
-		TunnelID:  r.TunEx.TunnelID,
-		Secret:    secret,
-		ConfigMap: configMap,
-	}
-
-	if r.TunEx.TunSpec.Container != nil {
-		if r.TunEx.TunSpec.Container.Image != "" {
-			tunnelDeploymentModel.Image = r.TunEx.TunSpec.Container.Image
-		}
-		if r.TunEx.TunSpec.Container.ImagePullPolicy != "" {
-			tunnelDeploymentModel.ImagePullPolicy = r.TunEx.TunSpec.Container.ImagePullPolicy
-		}
-		if len(r.TunEx.TunSpec.Container.Command) != 0 {
-			tunnelDeploymentModel.Command = r.TunEx.TunSpec.Container.Command
-		}
-		if len(r.TunEx.TunSpec.Container.Args) != 0 {
-			tunnelDeploymentModel.Args = r.TunEx.TunSpec.Container.Args
-		}
+		Name:       r.TunEx.Name,
+		Namespace:  r.TunEx.Namespace,
+		TunnelID:   r.TunEx.TunnelID,
+		Container:  r.TunEx.TunSpec.Container,
+		Deployment: r.TunEx.TunSpec.Deployment,
 	}
 
 	deploymentCreate := models.Deployment(tunnelDeploymentModel).GetDeployment()
